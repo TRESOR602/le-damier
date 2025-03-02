@@ -1,4 +1,5 @@
 #include<SDL2/SDL.h>
+#include<SDL2/SDL_mixer.h>
 #include<SDL2/SDL_ttf.h>
 #include<stdbool.h>
 #include<stddef.h>
@@ -61,6 +62,21 @@ SDL_Texture *textureDameNoir;
 } RessourcesSDL;
 
 
+void initAudio() {
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        printf("Erreur d'initialisation de SDL_mixer : %s\n", Mix_GetError());
+        exit(1);
+    }
+}
+
+Mix_Music* chargerMusique(const char *chemin) {
+    Mix_Music *musique = Mix_LoadMUS(chemin);
+    if (!musique) {
+        printf("Erreur de chargement de la musique : %s\n", Mix_GetError());
+        return NULL;
+    }
+    return musique;
+}
 
 void initialiserDamier(Damier *damier) {
     for (int i = 0; i < 8; i++) {
@@ -208,7 +224,7 @@ bool initialiserSDL(RessourcesSDL *res) {
     }
 
     // Charger la police
-    res->police = TTF_OpenFont("/home/dell/Bureau/le C/le dame/arial.ttf", 24);
+    res->police = TTF_OpenFont("/home/dell/Bureau/le C/le_dame/arial.ttf", 24);
     if (!res->police) {
         printf("Erreur de chargement de la police: %s\n", TTF_GetError());
         SDL_DestroyRenderer(res->rendu);
@@ -221,7 +237,7 @@ bool initialiserSDL(RessourcesSDL *res) {
     // Charger les textures
     SDL_Surface *surface = NULL;
 
-    surface = SDL_LoadBMP("/home/dell/Bureau/le C/le dame/pion_blanc.bmp");
+    surface = SDL_LoadBMP("/home/dell/Bureau/le C/le_dame/pion_blanc.bmp");
     if (!surface) {
         printf("Erreur de chargement de pion_blanc.bmp: %s\n", SDL_GetError());
         goto erreur;
@@ -233,7 +249,7 @@ bool initialiserSDL(RessourcesSDL *res) {
         goto erreur;
     }
 
-    surface = SDL_LoadBMP("/home/dell/Bureau/le C/le dame/pion_noir.bmp");
+    surface = SDL_LoadBMP("/home/dell/Bureau/le C/le_dame/pion_noir.bmp");
     if (!surface) {
         printf("Erreur de chargement de pion_noir.bmp: %s\n", SDL_GetError());
         goto erreur;
@@ -245,7 +261,7 @@ bool initialiserSDL(RessourcesSDL *res) {
         goto erreur;
     }
 
-    surface = SDL_LoadBMP("/home/dell/Bureau/le C/le dame/dame_blanc.bmp");
+    surface = SDL_LoadBMP("/home/dell/Bureau/le C/le_dame/dame_blanc.bmp");
     if (!surface) {
         printf("Erreur de chargement de dame_blanc.bmp: %s\n", SDL_GetError());
         goto erreur;
@@ -257,7 +273,7 @@ bool initialiserSDL(RessourcesSDL *res) {
         goto erreur;
     }
 
-    surface = SDL_LoadBMP("/home/dell/Bureau/le C/le dame/dame_noir.bmp");
+    surface = SDL_LoadBMP("/home/dell/Bureau/le C/le_dame/dame_noir.bmp");
     if (!surface) {
         printf("Erreur de chargement de dame_noir.bmp: %s\n", SDL_GetError());
         goto erreur;
@@ -382,88 +398,131 @@ bool estPositionValide(Position pos) {
 
 
 bool estMouvementValide(JeuDeDames *jeu, Mouvement mouv) {
-// Vérifier que les positions sont valides
-if (!estPositionValide(mouv.debut) || !estPositionValide(mouv.fin)) {
-return false;
-}
-// Vérifier que la case de départ contient un pion du joueur actuel
-int pieceDepart = jeu->plateau[mouv.debut.ligne][mouv.debut.colonne];
-if (jeu->joueurActuel == 1 && (pieceDepart != PION_BLANC && pieceDepart !=
-DAME_BLANCHE)) {
-return false;
-}
-if (jeu->joueurActuel == 2 && (pieceDepart != PION_NOIR && pieceDepart !=
-DAME_NOIRE)) {
-return false;
-}
-// Vérifier que la case d'arrivée est vide
-if (jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] != VIDE) {
-return false;
-}
-// Vérifier que la case d'arrivée est une case noire
-if ((mouv.fin.ligne + mouv.fin.colonne) % 2 == 0) {
-return false;
-}
-// Calcul des différences entre positions
-int diffLigne = mouv.fin.ligne - mouv.debut.ligne;
-int diffColonne = mouv.fin.colonne - mouv.debut.colonne;
-// Vérification du sens du mouvement pour les pions
-if (pieceDepart == PION_BLANC && diffLigne >= 0) {
-return false; // Les pions blancs ne peuvent aller que vers le haut
-}
-if (pieceDepart == PION_NOIR && diffLigne <= 0) {
-return false; // Les pions noirs ne peuvent aller que vers le bas
-}
-// Mouvement simple en diagonale
-if (abs(diffLigne) == 1 && abs(diffColonne) == 1) {
-return true;
-}
-// Mouvement de prise (saut par-dessus un pion adverse)
-if (abs(diffLigne) == 2 && abs(diffColonne) == 2) {
-// Position du pion à prendre
-Position positionPrise;
-positionPrise.ligne = mouv.debut.ligne + diffLigne / 2;
-positionPrise.colonne = mouv.debut.colonne + diffColonne / 2;
-// Vérifier qu'il y a un pion adverse à prendre
-int piecePrise = jeu->plateau[positionPrise.ligne][positionPrise.colonne];
-if (jeu->joueurActuel == 1 && (piecePrise == PION_NOIR || piecePrise ==
-DAME_NOIRE)) {
-return true;
-}
-if (jeu->joueurActuel == 2 && (piecePrise == PION_BLANC || piecePrise ==
-DAME_BLANCHE)) {
-return true;
-}
-}
-// Mouvement invalide dans tous les autres cas
-return false;
-}
+    // Vérifier que les positions sont valides
+    if (!estPositionValide(mouv.debut) || !estPositionValide(mouv.fin)) {
+        return false;
+    }
 
+    // Vérifier que la case de départ contient un pion du joueur actuel
+    int pieceDepart = jeu->plateau[mouv.debut.ligne][mouv.debut.colonne];
+    if (jeu->joueurActuel == 1 && (pieceDepart != PION_BLANC && pieceDepart != DAME_BLANCHE)) {
+        return false;
+    }
+    if (jeu->joueurActuel == 2 && (pieceDepart != PION_NOIR && pieceDepart != DAME_NOIRE)) {
+        return false;
+    }
+
+    // Vérifier que la case d'arrivée est vide
+    if (jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] != VIDE) {
+        return false;
+    }
+
+    // Vérifier que la case d'arrivée est une case noire
+    if ((mouv.fin.ligne + mouv.fin.colonne) % 2 == 0) {
+        return false;
+    }
+
+    // Calcul des différences entre positions
+    int diffLigne = mouv.fin.ligne - mouv.debut.ligne;
+    int diffColonne = mouv.fin.colonne - mouv.debut.colonne;
+
+    // Vérification du mouvement des dames
+    if (jeu->plateau[mouv.debut.ligne][mouv.debut.colonne] == DAME_BLANCHE || jeu->plateau[mouv.debut.ligne][mouv.debut.colonne] == DAME_NOIRE) {
+        // Mouvement d'une dame (peut aller en diagonale sur plusieurs cases)
+        if (abs(diffLigne) == abs(diffColonne)) {//mouvement en diagonale
+            int directionLigne = (diffLigne > 0) ? 1 : -1;
+            int directionColonne = (diffColonne > 0) ? 1 : -1;
+
+            // Vérifier qu'il n'y a pas d'obstacle sur le chemin de la dame
+            int i = mouv.debut.ligne + directionLigne;
+int j = mouv.debut.colonne + directionColonne;
+bool aMange=false;
+Position posPionMange={-1,-1};
+while (i != mouv.fin.ligne && j != mouv.fin.colonne) {
+    if (jeu->plateau[i][j] != VIDE) {
+    //si une piece est sur le chemin
+     if (!aMange && ((jeu->joueurActuel == 1 && (jeu->plateau[i][j] == PION_NOIR || jeu->plateau[i][j] == DAME_NOIRE)) ||
+                                (jeu->joueurActuel == 2 && (jeu->plateau[i][j] == PION_BLANC || jeu->plateau[i][j] == DAME_BLANCHE)))) {
+                    aMange = true; // Il y a un pion adverse à prendre
+                    posPionMange.ligne = i;
+                    posPionMange.colonne = j;
+                } else {
+        return false; // Il y a un obstacle sur la trajectoire
+    }
+    i += directionLigne;
+    j += directionColonne;
+}
+if (aMange) {
+            jeu->plateau[posPionMange.ligne][posPionMange.colonne] = VIDE; // Retirer le pion pris
+        }
+return true;
+        }
+    }
+    }
+
+    // Vérification du mouvement des pions
+    if (abs(diffLigne) == 1 && abs(diffColonne) == 1) {
+    // Interdire le recul sauf pour une prise
+    if ((jeu->joueurActuel == 1 && diffLigne > 0) || 
+        (jeu->joueurActuel == 2 && diffLigne < 0)) {
+        return false; // Pion blanc ne peut pas descendre, pion noir ne peut pas monter
+    }
+    return true; // Mouvement simple en diagonale
+}
+    // Mouvement de prise
+    if (abs(diffLigne) == 2 && abs(diffColonne) == 2) {
+        Position positionPrise;
+        positionPrise.ligne = mouv.debut.ligne + diffLigne / 2;
+        positionPrise.colonne = mouv.debut.colonne + diffColonne / 2;
+
+        // Vérifier qu'il y a un pion adverse à prendre
+        int piecePrise = jeu->plateau[positionPrise.ligne][positionPrise.colonne];
+        if (jeu->joueurActuel == 1 && (piecePrise == PION_NOIR || piecePrise == DAME_NOIRE)) {
+            return true;
+        }
+        if (jeu->joueurActuel == 2 && (piecePrise == PION_BLANC || piecePrise == DAME_BLANCHE)) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 
 void effectuerMouvement(JeuDeDames *jeu, Mouvement mouv) {
-// Déplacer le pion
-jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] = jeu->plateau[mouv.debut.ligne][mouv.debut.colonne];
-jeu->plateau[mouv.debut.ligne][mouv.debut.colonne] = VIDE;
-// Vérifier si c'est une prise
-if (abs(mouv.fin.ligne - mouv.debut.ligne) == 2) {
-// Calculer la position du pion pris
-int ligneIntermediaire = (mouv.debut.ligne + mouv.fin.ligne) / 2;
-int colonneIntermediaire = (mouv.debut.colonne + mouv.fin.colonne) / 2;
-// Enlever le pion pris
-jeu->plateau[ligneIntermediaire][colonneIntermediaire] = VIDE;
-}
-// Vérifier si un pion doit être transformé en dame
-if (jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] == PION_BLANC && mouv.fin.ligne
-== 0) {
-jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] = DAME_BLANCHE;
-}
-if (jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] == PION_NOIR && mouv.fin.ligne
-== TAILLE - 1) {
-jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] = DAME_NOIRE;
-}
-// Changer de joueur
-jeu->joueurActuel = (jeu->joueurActuel == 1) ? 2 : 1;
+    jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] = jeu->plateau[mouv.debut.ligne][mouv.debut.colonne];
+    jeu->plateau[mouv.debut.ligne][mouv.debut.colonne] = VIDE;
+
+    // Vérifier si c'est une prise
+    int diffLigne = mouv.fin.ligne - mouv.debut.ligne;
+    int diffColonne = mouv.fin.colonne - mouv.debut.colonne;
+
+    if (abs(diffLigne) > 1) {
+        int directionLigne = (diffLigne > 0) ? 1 : -1;
+        int directionColonne = (diffColonne > 0) ? 1 : -1;
+
+        for (int i = 1; i < abs(diffLigne); i++) {
+            int ligne = mouv.debut.ligne + i * directionLigne;
+            int colonne = mouv.debut.colonne + i * directionColonne;
+
+            if ((jeu->joueurActuel == 1 && (jeu->plateau[ligne][colonne] == PION_NOIR || jeu->plateau[ligne][colonne] == DAME_NOIRE)) ||
+                (jeu->joueurActuel == 2 && (jeu->plateau[ligne][colonne] == PION_BLANC || jeu->plateau[ligne][colonne] == DAME_BLANCHE))) {
+                jeu->plateau[ligne][colonne] = VIDE; // Retirer le pion capturé
+                break;
+            }
+        }
+    }
+
+    // Promotion en dame
+    if (jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] == PION_BLANC && mouv.fin.ligne == 0) {
+        jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] = DAME_BLANCHE;
+    }
+    if (jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] == PION_NOIR && mouv.fin.ligne == 7) {
+        jeu->plateau[mouv.fin.ligne][mouv.fin.colonne] = DAME_NOIRE;
+    }
+
+    // Changer de joueur
+    jeu->joueurActuel = (jeu->joueurActuel == 1) ? 2 : 1;
 }
 
 
@@ -581,6 +640,22 @@ void afficherMessageFin(RessourcesSDL *ressources, JeuDeDames *jeu){}
 
 
 int main(int argc, char *argv[]) {
+ // Initialisation de SDL
+    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
+        printf("Erreur d'initialisation de SDL : %s\n", SDL_GetError());
+        return 1;
+    }
+initAudio();  // Initialisation du son
+
+// Charger la musique
+    Mix_Music *musique = chargerMusique("/home/dell/Bureau/le C/le_dame/music.mp3");
+    if (musique) {
+        Mix_PlayMusic(musique, -1); // -1 pour une lecture infinie
+    }
+ 
+ 
+ 
+ 
     JeuDeDames jeu;
     RessourcesSDL ressources;
     bool continuer = true;
@@ -643,6 +718,10 @@ int main(int argc, char *argv[]) {
 
     // Libérer les ressources SDL proprement
     libererSDL(&ressources);
+    //liberation de la memoire
+     Mix_FreeMusic(musique);
+    Mix_CloseAudio();
+    SDL_Quit();
     return EXIT_SUCCESS;
 }
 
